@@ -319,7 +319,7 @@ class InterviewSession:
         if row:
             row.state        = InterviewState.COMPLETE.value
             row.completed_at = summary.completed_at
-            await self.db.flush()
+            await self.db.commit()
 
         self.state = InterviewState.COMPLETE
 
@@ -434,7 +434,7 @@ class InterviewSession:
         return {"type": "state_change", "data": {"state": self.state.value}}
 
     async def _persist_state(self) -> None:
-        """Flush current state and question index to SQLite."""
+        """Commit current state and question index to SQLite."""
         row: Optional[InterviewSessionDB] = await self.db.get(
             InterviewSessionDB, self.session_id
         )
@@ -443,7 +443,7 @@ class InterviewSession:
             row.current_question_index = self.current_index
             if self.started_at and not row.started_at:
                 row.started_at = self.started_at
-            await self.db.flush()
+            await self.db.commit()
 
     async def _save_answer(
         self,
@@ -464,7 +464,7 @@ class InterviewSession:
             evaluation_data = ev.model_dump(mode="json"),
         )
         self.db.add(answer_row)
-        await self.db.flush()
+        await self.db.commit()
 
 
 # ── Session registry ───────────────────────────────────────────────────────────

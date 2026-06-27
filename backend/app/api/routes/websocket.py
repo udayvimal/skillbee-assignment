@@ -144,6 +144,11 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str) -> None:
                     await _send(websocket, event)
 
             elif msg_type == "skip":
+                if answer_processing:
+                    # Evaluation is running — _advance_question() will handle
+                    # the next question automatically; ignore this skip to
+                    # prevent current_index being incremented twice.
+                    continue
                 session.current_index += 1
                 await session._persist_state()
                 if session.current_index >= len(session.questions):
