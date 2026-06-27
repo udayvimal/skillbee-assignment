@@ -308,7 +308,7 @@ export function InterviewRoom({ sessionId }: InterviewRoomProps) {
                       agentActive ? (
                         <>
                           <span className="w-2 h-2 rounded-full bg-[#10b981] animate-pulse" />
-                          Agent is speaking — please wait
+                          Agent is speaking…
                         </>
                       ) : (
                         <>
@@ -340,11 +340,18 @@ export function InterviewRoom({ sessionId }: InterviewRoomProps) {
                   </button>
                 )}
 
-                {canRecord && !isRecording && !isWaiting && (
+                {/* Skip is available both during agent speech (to cut audio) and
+                    during LISTENING (to skip the question entirely).
+                    Hidden only when the user is actively recording. */}
+                {!isRecording && currentQuestion && (
                   <button
                     onClick={skipQuestion}
-                    className="px-4 py-3 rounded-xl border border-gray-200 text-xs text-gray-400 font-medium hover:border-gray-300 hover:text-gray-600 transition-colors"
+                    className="px-4 py-3 rounded-xl border border-gray-200 text-xs text-gray-400 font-medium hover:border-gray-300 hover:text-gray-600 transition-colors flex items-center gap-1.5"
+                    title="Skip this question"
                   >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                    </svg>
                     Skip
                   </button>
                 )}
