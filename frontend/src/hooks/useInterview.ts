@@ -134,9 +134,16 @@ export function useInterview(sessionId: string) {
           router.replace("/");
           break;
 
-        case "error":
-          console.warn("[WS] server error:", (data as { message: string }).message);
+        case "error": {
+          const errData = data as { message: string; code?: string };
+          console.warn("[WS] server error:", errData.message);
+          // Proxy may strip WS close code 1008 — catch it via message instead
+          if (errData.code === "SESSION_NOT_FOUND") {
+            log("SESSION_NOT_FOUND via error message — redirecting home");
+            router.replace("/");
+          }
           break;
+        }
 
         // ── Audio-carrying events — serialised through the task queue ──────
 
