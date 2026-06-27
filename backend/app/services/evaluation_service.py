@@ -111,12 +111,18 @@ class EvaluationService:
             for r, _ in similar
         )
 
+        lang_instruction = {
+            "hi": "IMPORTANT: Write the 'feedback' and 'ideal_answer_summary' fields in Hindi.",
+            "de": "IMPORTANT: Write the 'feedback' and 'ideal_answer_summary' fields in German (Deutsch).",
+        }.get(language, "")
+
         user_prompt = (
             f"QUESTION: {question_text}\n\n"
             f"CANDIDATE ANSWER: {answer_text or '[No answer — candidate skipped]'}\n\n"
             f"REFERENCE ANSWER: {reference_text}\n\n"
             f"KEY POINTS TO CHECK: {', '.join(key_points)}\n\n"
             f"RELATED CONTEXT:\n{supplementary}"
+            + (f"\n\n{lang_instruction}" if lang_instruction else "")
         )
 
         raw = await llm_service.chat(
@@ -161,10 +167,12 @@ class EvaluationService:
         language: str = "en",
     ) -> str:
         """Generate a targeted follow-up question for a partial answer (score 5–8)."""
+        lang_note = {"hi": " Respond in Hindi.", "de": " Respond in German (Deutsch)."}.get(language, "")
         prompt = (
             f"Original question: {question_text}\n"
             f"Candidate answer: {answer_text}\n"
             f"Identified weaknesses: {', '.join(weaknesses)}"
+            + lang_note
         )
         text = await llm_service.chat_fast(
             messages=[
@@ -188,11 +196,13 @@ class EvaluationService:
         This is spoken aloud to the candidate to explain what was missing
         and briefly reveal the ideal approach.
         """
+        lang_note = {"hi": " Respond in Hindi.", "de": " Respond in German (Deutsch)."}.get(language, "")
         prompt = (
             f"Question: {question_text}\n"
             f"Candidate answer: {answer_text or '[No answer given]'}\n"
             f"Ideal answer: {ideal_answer}\n"
             f"Key points the candidate missed: {', '.join(key_points)}"
+            + lang_note
         )
         raw = await llm_service.chat_fast(
             messages=[
