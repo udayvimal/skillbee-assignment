@@ -52,9 +52,12 @@ yarn-error.log*
 .DS_Store
 Thumbs.db
 *.webp
-*.png
 *.jpg
 *.jpeg
+
+# Images — allow docs/screenshots, ignore everything else
+*.png
+!docs/screenshots/*.png
 
 # IDE
 .vscode/
