@@ -139,10 +139,20 @@ class InterviewSession:
                 "audio":            base64.b64encode(audio).decode() if audio else None,
             },
         }
+        # State stays QUESTION here.
+        # The backend only transitions to LISTENING when the client sends
+        # "ready_to_listen" — i.e. after it has finished playing the audio.
+        # This prevents submit_audio from accepting answers during audio playback.
 
-        self.state = InterviewState.LISTENING
-        await self._persist_state()
-        yield self._state_event()
+    async def client_ready_to_listen(self) -> None:
+        """
+        Called when the client sends 'ready_to_listen' — meaning the question
+        audio has finished playing and the mic is now active.
+        Only transition to LISTENING if we're still in QUESTION state.
+        """
+        if self.state == InterviewState.QUESTION:
+            self.state = InterviewState.LISTENING
+            await self._persist_state()
 
     async def process_answer(
         self, answer_text: str

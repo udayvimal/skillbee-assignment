@@ -176,6 +176,10 @@ export function useInterview(sessionId: string) {
 
             log(`QUESTION_${d.question_num}_AUDIO_DONE`);
             setIsAgentSpeaking(false);
+            // Tell the backend the audio finished — it will now set LISTENING
+            // and start accepting audio submissions. This is the synchronization
+            // point that prevents premature answer acceptance during audio playback.
+            send({ type: "ready_to_listen" });
             setInterviewState("LISTENING" as never);
             log("MIC_ENABLED");
           });
@@ -226,6 +230,7 @@ export function useInterview(sessionId: string) {
             await player.playAsync(d.audio, d.text);
             if (!mountedRef.current || player.wasStopped()) return;
             setIsAgentSpeaking(false);
+            send({ type: "ready_to_listen" });
             setInterviewState("LISTENING" as never);
             log("MIC_ENABLED (follow-up)");
           });
@@ -292,7 +297,7 @@ export function useInterview(sessionId: string) {
     },
     // All deps are stable (Zustand actions, enqueue, player methods)
     [
-      enqueue, player.playAsync, player.wasStopped,
+      enqueue, send, player.playAsync, player.wasStopped,
       setInterviewState, setCurrentQuestion, addTranscriptEntry, addEvaluation,
       clearEvaluations, setTeachingData, setSummary, setIsAgentSpeaking, setIsProcessing,
       setUserTranscript, setFollowUpText, setIsFollowUpActive,

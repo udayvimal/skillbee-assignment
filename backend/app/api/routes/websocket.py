@@ -153,6 +153,11 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str) -> None:
                     async for event in session.deliver_question():
                         await _send(websocket, event)
 
+            elif msg_type == "ready_to_listen":
+                # Client finished playing question audio — now safe to accept answers
+                await session.client_ready_to_listen()
+                await _send(websocket, {"type": "state_change", "data": {"state": "LISTENING"}})
+
             elif msg_type == "answer_ready":
                 pass  # pending answer will be picked up next iteration
 
