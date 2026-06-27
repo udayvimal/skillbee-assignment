@@ -41,32 +41,9 @@
 <tr>
 <td width="50%" valign="top">
 
-**Voice Controls** — Start Speaking / Done Speaking with real-time waveform
-
-![Voice Controls](docs/screenshots/voice-controls.png)
-
-</td>
-<td width="50%" valign="top">
-
 **Live Transcript** — agent messages + user answers, timestamped
 
 ![Live Transcript](docs/screenshots/transcript.png)
-
-</td>
-</tr>
-<tr>
-<td width="50%" valign="top">
-
-**Analytics Report** — overall score, grade, radar chart by category
-
-![Analytics Dashboard](docs/screenshots/analytics-dashboard.png)
-
-</td>
-<td width="50%" valign="top">
-
-**Per-Question Breakdown** — sub-scores, your answer vs ideal answer
-
-![Question Breakdown](docs/screenshots/question-breakdown.png)
 
 </td>
 </tr>
