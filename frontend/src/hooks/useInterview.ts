@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import type {
   ConnectedEvent,
@@ -23,6 +24,7 @@ const log = (event: string, detail?: string) =>
   console.log(`[INTERVIEW] ${event}${detail ? " — " + detail : ""}`);
 
 export function useInterview(sessionId: string) {
+  const router = useRouter();
   // Stable Zustand action refs (Zustand guarantees these never change)
   const setInterviewState   = useInterviewStore((s) => s.setInterviewState);
   const setCurrentQuestion  = useInterviewStore((s) => s.setCurrentQuestion);
@@ -124,6 +126,13 @@ export function useInterview(sessionId: string) {
           }
           break;
         }
+
+        case "session_not_found":
+          // Session missing from DB (e.g. created before a schema migration).
+          // Stop retrying and send user back to start a fresh interview.
+          log("SESSION_NOT_FOUND — redirecting home");
+          router.replace("/");
+          break;
 
         case "error":
           console.warn("[WS] server error:", (data as { message: string }).message);

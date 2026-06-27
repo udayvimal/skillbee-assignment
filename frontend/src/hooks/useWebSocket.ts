@@ -68,9 +68,16 @@ export function useWebSocket({ sessionId, onMessage, onStatusChange }: UseWebSoc
 
       if (!mounted.current) return;
 
-      // 1000 = normal close (session ended / server clean shutdown) — don't retry
+      // 1000/1001 = normal close — don't retry
       if (e.code === 1000 || e.code === 1001) {
         changeStatus("closed");
+        return;
+      }
+
+      // 1008 = session not found — stop retrying, signal fatal error
+      if (e.code === 1008) {
+        changeStatus("error");
+        onMessageRef.current({ type: "session_not_found", data: {} } as WSEvent);
         return;
       }
 
