@@ -1,35 +1,53 @@
 """
-Retrieval service using fastembed (ONNX-based, no PyTorch dependency)
-and FAISS for vector similarity search.
+Retrieval service — lightweight keyword-based similarity search.
 
-Embeddings are built once on first startup and cached to disk so
-subsequent restarts skip the heavy embedding step entirely.
+Uses Jaccard word-overlap scoring instead of neural embeddings.
+For a 31-question dataset this gives perfectly adequate retrieval quality
+while using < 5 MB RAM (vs. fastembed ONNX which requires ~300 MB on Render Free Tier).
+
+The public interface is identical to the previous fastembed/FAISS implementation
+so no callers need to change.
 """
 
 import json
 import logging
 import random
-from pathlib import Path
+import re
 from typing import Any, Dict, List, Optional, Tuple
-
-import faiss
-import numpy as np
 
 from ..config import settings
 
 logger = logging.getLogger(__name__)
 
+# Common English stop words to ignore in similarity scoring
+_STOPWORDS = {
+    "a", "an", "the", "is", "it", "its", "in", "of", "to", "and", "or",
+    "for", "on", "with", "as", "by", "at", "be", "are", "was", "were",
+    "this", "that", "these", "those", "from", "have", "has", "had", "do",
+    "does", "did", "will", "would", "could", "should", "can", "may", "what",
+    "how", "why", "when", "where", "which", "who", "you", "we", "they",
+    "i", "not", "no", "so", "if", "but", "than", "then", "also", "more",
+}
+
+
+def _tokenize(text: str) -> set:
+    """Lowercase, strip punctuation, remove stop words."""
+    tokens = re.findall(r"[a-z0-9]+", text.lower())
+    return {t for t in tokens if t not in _STOPWORDS and len(t) > 1}
+
+
+def _jaccard(a: set, b: set) -> float:
+    if not a or not b:
+        return 0.0
+    return len(a & b) / len(a | b)
+
 
 class RetrievalService:
     def __init__(self) -> None:
-        self.index: Optional[faiss.IndexFlatIP] = None
         self.questions: List[Dict[str, Any]] = []
-        self._corpus_texts: List[str] = []
         self._initialized = False
-
-    # ------------------------------------------------------------------
-    # Initialisation
-    # ------------------------------------------------------------------
+        # Pre-tokenized corpus for fast repeated searches
+        self._corpus_tokens: List[set] = []
 
     async def initialize(self) -> None:
         if self._initialized:
@@ -40,58 +58,19 @@ class RetrievalService:
             dataset = json.load(fh)
         self.questions = dataset["questions"]
 
-        # Corpus: question + reference answer for rich semantic matching
-        self._corpus_texts = [
-            f"{q['question']} {q['reference_answer']}" for q in self.questions
+        # Pre-tokenise each question + reference answer once
+        self._corpus_tokens = [
+            _tokenize(f"{q['question']} {q['reference_answer']}")
+            for q in self.questions
         ]
 
-        cache_path = Path(settings.EMBEDDINGS_CACHE_PATH)
-        index_path = Path(settings.FAISS_INDEX_PATH)
-
-        if cache_path.exists() and index_path.exists():
-            logger.info("Loading cached FAISS index and embeddings")
-            data = np.load(str(cache_path))
-            embeddings = data["embeddings"]
-            self.index = faiss.read_index(str(index_path))
-        else:
-            logger.info("Building embeddings with %s (first-time only)", settings.EMBEDDING_MODEL)
-            embeddings = self._build_embeddings(self._corpus_texts)
-            cache_path.parent.mkdir(parents=True, exist_ok=True)
-            np.savez(str(cache_path), embeddings=embeddings)
-            faiss.write_index(self.index, str(index_path))
-            logger.info("Embeddings and index cached to disk")
-
         self._initialized = True
-        logger.info("Retrieval service ready (%d questions indexed)", len(self.questions))
-
-    def _build_embeddings(self, texts: List[str]) -> np.ndarray:
-        """Build and normalise embeddings; also constructs the FAISS index."""
-        from fastembed import TextEmbedding  # lazy import to control memory timing
-
-        model = TextEmbedding(model_name=settings.EMBEDDING_MODEL)
-        raw = np.array(list(model.embed(texts)), dtype=np.float32)
-        del model  # free ONNX session memory
-
-        norms = np.linalg.norm(raw, axis=1, keepdims=True)
-        embeddings = raw / np.maximum(norms, 1e-9)
-
-        dim = embeddings.shape[1]
-        self.index = faiss.IndexFlatIP(dim)  # cosine similarity after L2-norm
-        self.index.add(embeddings)
-        return embeddings
-
-    def _embed_query(self, text: str) -> np.ndarray:
-        """Embed a single query at evaluation time."""
-        from fastembed import TextEmbedding
-
-        model = TextEmbedding(model_name=settings.EMBEDDING_MODEL)
-        raw = np.array(list(model.embed([text])), dtype=np.float32)
-        del model
-        norm = np.linalg.norm(raw, axis=1, keepdims=True)
-        return raw / np.maximum(norm, 1e-9)
+        logger.info(
+            "Retrieval service ready (%d questions, keyword-based)", len(self.questions)
+        )
 
     # ------------------------------------------------------------------
-    # Public interface
+    # Public interface (identical to the previous fastembed/FAISS version)
     # ------------------------------------------------------------------
 
     def search(
@@ -104,25 +83,21 @@ class RetrievalService:
         if not self._initialized:
             raise RuntimeError("RetrievalService not initialized")
 
-        query_emb = self._embed_query(query)
-        scores, indices = self.index.search(query_emb, min(k * 3, len(self.questions)))
-
+        query_tokens = _tokenize(query)
         exclude = set(exclude_ids or [])
-        results: List[Tuple[Dict[str, Any], float]] = []
-        for score, idx in zip(scores[0], indices[0]):
-            if idx < 0:
-                continue
-            q = self.questions[int(idx)]
+
+        scored: List[Tuple[Dict[str, Any], float]] = []
+        for q, corpus_tokens in zip(self.questions, self._corpus_tokens):
             if q["id"] in exclude:
                 continue
-            results.append((q, float(score)))
-            if len(results) >= k:
-                break
+            score = _jaccard(query_tokens, corpus_tokens)
+            scored.append((q, score))
 
-        return results
+        scored.sort(key=lambda x: x[1], reverse=True)
+        return scored[:k]
 
     def get_reference_for_question(self, question_id: str) -> Optional[Dict[str, Any]]:
-        """Fetch a question by ID (direct lookup for the current interview question)."""
+        """Fetch a question by ID — direct O(n) lookup."""
         for q in self.questions:
             if q["id"] == question_id:
                 return q
@@ -135,10 +110,7 @@ class RetrievalService:
         count: int,
         categories: Optional[List[str]] = None,
     ) -> List[Dict[str, Any]]:
-        """
-        Select a diverse, role-appropriate set of questions for an interview.
-        Always includes 1-2 behavioral questions regardless of role.
-        """
+        """Select a diverse, role-appropriate set of questions for an interview."""
         role_category_map: Dict[str, List[str]] = {
             "frontend":      ["JavaScript", "TypeScript", "React", "Databases", "Behavioral"],
             "backend":       ["Python", "System Design", "Databases", "API Design", "Behavioral"],
@@ -150,30 +122,20 @@ class RetrievalService:
 
         target_cats = set(categories or role_category_map.get(role, role_category_map["general"]))
 
-        # Prefer exact difficulty; fall back to any difficulty if not enough
-        primary = [
-            q for q in self.questions
-            if q["difficulty"] == difficulty and q["category"] in target_cats
-        ]
-        fallback = [
-            q for q in self.questions
-            if q["difficulty"] != difficulty and q["category"] in target_cats
-        ]
+        primary  = [q for q in self.questions if q["difficulty"] == difficulty and q["category"] in target_cats]
+        fallback = [q for q in self.questions if q["difficulty"] != difficulty and q["category"] in target_cats]
         pool = primary + fallback
 
-        # Ensure behavioral coverage
         behavioral = [q for q in pool if q["category"] == "Behavioral"]
-        technical = [q for q in pool if q["category"] != "Behavioral"]
+        technical  = [q for q in pool if q["category"] != "Behavioral"]
 
         random.shuffle(behavioral)
         random.shuffle(technical)
 
         selected: List[Dict[str, Any]] = []
-        # Pick 1-2 behavioral questions
         for q in behavioral[:2]:
             selected.append(q)
 
-        # Fill remaining slots with technical, max 2 per category
         cat_counts: Dict[str, int] = {}
         for q in technical:
             cat = q["category"]

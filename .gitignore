@@ -19,9 +19,6 @@ build/
 *.db-shm
 *.db-wal
 
-# FAISS index and embeddings cache (rebuilt on startup)
-backend/app/data/faiss.index
-backend/app/data/embeddings_cache.npz
 backend/app/data/interview.db
 
 # Node
