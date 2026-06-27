@@ -19,6 +19,11 @@ build/
 *.db-shm
 *.db-wal
 
+# Embeddings cache (generated at runtime, not for git)
+*.npz
+*.index
+*.faiss
+
 backend/app/data/interview.db
 
 # Node
