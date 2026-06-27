@@ -65,7 +65,6 @@
 </tr>
 </table>
 
-> **To add screenshots:** run the app, take screenshots of each page, and save them as the filenames above inside `docs/screenshots/`.
 
 ---
 
