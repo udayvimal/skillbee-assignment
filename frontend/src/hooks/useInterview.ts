@@ -48,6 +48,9 @@ export function useInterview(sessionId: string) {
   const taskQueueRef  = useRef<Array<() => Promise<void>>>([]);
   const taskBusyRef   = useRef(false);
   const mountedRef    = useRef(true);
+  // sendRef breaks the circular dependency: handleMessage needs to call send(),
+  // but send() comes from useWebSocket which takes handleMessage as a param.
+  const sendRef = useRef<((msg: Record<string, unknown>) => void) | null>(null);
 
   const runQueue = useCallback(async () => {
     if (taskBusyRef.current) return;
@@ -179,7 +182,7 @@ export function useInterview(sessionId: string) {
             // Tell the backend the audio finished — it will now set LISTENING
             // and start accepting audio submissions. This is the synchronization
             // point that prevents premature answer acceptance during audio playback.
-            send({ type: "ready_to_listen" });
+            sendRef.current?.({ type: "ready_to_listen" });
             setInterviewState("LISTENING" as never);
             log("MIC_ENABLED");
           });
@@ -230,7 +233,7 @@ export function useInterview(sessionId: string) {
             await player.playAsync(d.audio, d.text);
             if (!mountedRef.current || player.wasStopped()) return;
             setIsAgentSpeaking(false);
-            send({ type: "ready_to_listen" });
+            sendRef.current?.({ type: "ready_to_listen" });
             setInterviewState("LISTENING" as never);
             log("MIC_ENABLED (follow-up)");
           });
@@ -296,8 +299,9 @@ export function useInterview(sessionId: string) {
       }
     },
     // All deps are stable (Zustand actions, enqueue, player methods)
+    // send is accessed via sendRef — not listed here to avoid circular dependency
     [
-      enqueue, send, player.playAsync, player.wasStopped,
+      enqueue, player.playAsync, player.wasStopped,
       setInterviewState, setCurrentQuestion, addTranscriptEntry, addEvaluation,
       clearEvaluations, setTeachingData, setSummary, setIsAgentSpeaking, setIsProcessing,
       setUserTranscript, setFollowUpText, setIsFollowUpActive,
@@ -305,6 +309,7 @@ export function useInterview(sessionId: string) {
   );
 
   const { status, send } = useWebSocket({ sessionId, onMessage: handleMessage });
+  sendRef.current = send; // keep ref in sync so handleMessage can call it
 
   // ── Public actions ─────────────────────────────────────────────────────────
 
