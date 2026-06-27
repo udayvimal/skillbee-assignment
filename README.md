@@ -8,12 +8,22 @@
 
 [![Python 3.10](https://img.shields.io/badge/python-3.10+-blue?style=flat-square)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?style=flat-square)](https://fastapi.tiangolo.com)
-[![Next.js 15](https://img.shields.io/badge/Next.js-15-black?style=flat-square)](https://nextjs.org)
+[![Next.js 16](https://img.shields.io/badge/Next.js-16-black?style=flat-square)](https://nextjs.org)
 [![Groq](https://img.shields.io/badge/Groq-LLaMA%203.3%2070B-orange?style=flat-square)](https://groq.com)
-[![FAISS](https://img.shields.io/badge/retrieval-FAISS%20%2B%20fastembed-blueviolet?style=flat-square)](https://faiss.ai)
+[![TF-IDF](https://img.shields.io/badge/retrieval-TF--IDF%20cosine-blueviolet?style=flat-square)](#)
 [![License MIT](https://img.shields.io/badge/license-MIT-green?style=flat-square)](#)
 
-**[Live Demo (Render + Vercel)](#deployment)** · **[API Docs](http://localhost:8000/docs)** · **[Architecture](ARCHITECTURE.md)**
+### 🔗 Deliverable Links
+
+| | Link |
+|---|---|
+| 🌐 **Live App** | [skillbee-assignment-git-main-udayvimal08-3297s-projects.vercel.app](https://skillbee-assignment-git-main-udayvimal08-3297s-projects.vercel.app) |
+| 🎥 **Demo Video** | [youtu.be/3yzCq5ZbwKI](https://youtu.be/3yzCq5ZbwKI) |
+| 📐 **Architecture Note** | [ARCHITECTURE.md](https://github.com/udayvimal/skillbee-assignment/blob/main/ARCHITECTURE.md) |
+| 🗃️ **Q&A Dataset** | [qa\_dataset.json](https://github.com/udayvimal/skillbee-assignment/blob/main/backend/app/data/qa_dataset.json) |
+| ⚙️ **Backend API** | [skillbee-assignment.onrender.com/health](https://skillbee-assignment.onrender.com/health) |
+
+**[Live Demo](#deployment)** · **[API Docs](https://skillbee-assignment.onrender.com/docs)** · **[Architecture](ARCHITECTURE.md)**
 
 </div>
 
