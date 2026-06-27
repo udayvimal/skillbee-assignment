@@ -17,13 +17,13 @@
 
 | | Link |
 |---|---|
-| 🌐 **Live App** | [skillbee-assignment-git-main-udayvimal08-3297s-projects.vercel.app](https://skillbee-assignment-git-main-udayvimal08-3297s-projects.vercel.app) |
+| 🌐 **Live App** | [skillbee-assignment.vercel.app](https://skillbee-assignment.vercel.app) |
 | 🎥 **Demo Video** | [youtu.be/3yzCq5ZbwKI](https://youtu.be/3yzCq5ZbwKI) |
 | 📐 **Architecture Note** | [ARCHITECTURE.md](https://github.com/udayvimal/skillbee-assignment/blob/main/ARCHITECTURE.md) |
 | 🗃️ **Q&A Dataset** | [qa\_dataset.json](https://github.com/udayvimal/skillbee-assignment/blob/main/backend/app/data/qa_dataset.json) |
 | ⚙️ **Backend API** | [skillbee-assignment.onrender.com/health](https://skillbee-assignment.onrender.com/health) |
 
-**[Live Demo](#deployment)** · **[API Docs](https://skillbee-assignment.onrender.com/docs)** · **[Architecture](ARCHITECTURE.md)**
+**[Live Demo](https://skillbee-assignment.vercel.app)** · **[API Docs](https://skillbee-assignment.onrender.com/docs)** · **[Architecture](ARCHITECTURE.md)**
 
 </div>
 
