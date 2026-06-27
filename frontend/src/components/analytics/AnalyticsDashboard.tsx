@@ -241,7 +241,7 @@ export function AnalyticsDashboard({ summary }: AnalyticsDashboardProps) {
                           <BarChart
                             data={SUB_SCORES.map((s) => ({
                               name: s.label,
-                              score: (e as Record<string, unknown>)[s.key] as number ?? 0,
+                              score: (e as unknown as Record<string, unknown>)[s.key] as number ?? 0,
                             }))}
                             margin={{ top: 0, right: 0, left: -20, bottom: 0 }}
                           >
