@@ -137,7 +137,7 @@ export function useInterview(sessionId: string) {
             addTranscriptEntry({ role: "agent", text: d.text, timestamp: new Date() });
             setIsAgentSpeaking(true);
             await player.playAsync(d.audio, d.text);
-            if (!mountedRef.current) return;
+            if (!mountedRef.current || player.wasStopped()) return;
             setIsAgentSpeaking(false);
             log("INTRO_DONE");
           });
@@ -150,9 +150,6 @@ export function useInterview(sessionId: string) {
             if (!mountedRef.current) return;
             log(`QUESTION_${d.question_num}_STARTED`);
 
-            // Reset all per-question state before showing the new question.
-            // clearEvaluations() removes the previous question's score card
-            // so it never appears alongside a different question's text.
             clearEvaluations();
             setCurrentQuestion(d);
             setFollowUpText(null);
@@ -168,17 +165,17 @@ export function useInterview(sessionId: string) {
               timestamp: new Date(),
             });
 
-            // QUESTION state: question card visible, mic DISABLED
             setInterviewState("QUESTION" as never);
             setIsAgentSpeaking(true);
 
             await player.playAsync(d.audio, d.question_text);
-            if (!mountedRef.current) return;
+
+            // If stop() was called (user skipped or component unmounted) do NOT
+            // set LISTENING — the skip handler owns the next state transition.
+            if (!mountedRef.current || player.wasStopped()) return;
 
             log(`QUESTION_${d.question_num}_AUDIO_DONE`);
             setIsAgentSpeaking(false);
-
-            // LISTENING state: mic ENABLED, countdown may start
             setInterviewState("LISTENING" as never);
             log("MIC_ENABLED");
           });
@@ -198,12 +195,11 @@ export function useInterview(sessionId: string) {
               evaluation: { score: d.score, feedback: d.feedback },
             });
             setIsProcessing(false);
-            // Score < 5 → teaching follows immediately; skip evaluation audio
-            // so the candidate hears only one correction, not two.
+            // score < 5 → teaching follows; skip eval audio to avoid double correction
             if (d.score >= 5) {
               setIsAgentSpeaking(true);
               await player.playAsync(d.audio, d.feedback);
-              if (!mountedRef.current) return;
+              if (!mountedRef.current || player.wasStopped()) return;
               setIsAgentSpeaking(false);
             }
             log("EVALUATION_DONE");
@@ -228,9 +224,8 @@ export function useInterview(sessionId: string) {
             setInterviewState("FOLLOW_UP" as never);
             setIsAgentSpeaking(true);
             await player.playAsync(d.audio, d.text);
-            if (!mountedRef.current) return;
+            if (!mountedRef.current || player.wasStopped()) return;
             setIsAgentSpeaking(false);
-            // Mic ON after follow-up audio completes
             setInterviewState("LISTENING" as never);
             log("MIC_ENABLED (follow-up)");
           });
@@ -243,7 +238,6 @@ export function useInterview(sessionId: string) {
             if (!mountedRef.current) return;
             log("TEACHING_STARTED");
             setTeachingData(d);
-            // Add to transcript so the candidate can read along
             addTranscriptEntry({
               role: "agent",
               text: d.text,
@@ -252,7 +246,7 @@ export function useInterview(sessionId: string) {
             setInterviewState("TEACHING" as never);
             setIsAgentSpeaking(true);
             await player.playAsync(d.audio, d.text);
-            if (!mountedRef.current) return;
+            if (!mountedRef.current || player.wasStopped()) return;
             setIsAgentSpeaking(false);
             log("TEACHING_DONE");
           });
@@ -266,7 +260,7 @@ export function useInterview(sessionId: string) {
             log("TRANSITION_STARTED");
             setIsAgentSpeaking(true);
             await player.playAsync(d.audio, d.text);
-            if (!mountedRef.current) return;
+            if (!mountedRef.current || player.wasStopped()) return;
             setIsAgentSpeaking(false);
             log("TRANSITION_DONE");
           });
@@ -279,13 +273,18 @@ export function useInterview(sessionId: string) {
             if (!mountedRef.current) return;
             log("SUMMARY_ARRIVED");
             setSummary(d);
-            setInterviewState("COMPLETE" as never);
-            log("INTERVIEW_COMPLETE");
+            // Play conclusion audio IN FULL before setting COMPLETE.
+            // Setting COMPLETE first triggers the redirect timer (2.5s in InterviewRoom)
+            // which unmounts the component and cuts off the audio mid-sentence.
             if (d.audio) {
               setIsAgentSpeaking(true);
-              await player.playAsync(d.audio, "Interview complete.");
-              if (mountedRef.current) setIsAgentSpeaking(false);
+              await player.playAsync(d.audio, "Thank you for completing the interview.");
+              if (!mountedRef.current) return;
+              setIsAgentSpeaking(false);
             }
+            // Now safe to set COMPLETE — redirect fires 2.5s from here
+            setInterviewState("COMPLETE" as never);
+            log("INTERVIEW_COMPLETE");
           });
           break;
         }
@@ -293,7 +292,7 @@ export function useInterview(sessionId: string) {
     },
     // All deps are stable (Zustand actions, enqueue, player methods)
     [
-      enqueue, player.playAsync,
+      enqueue, player.playAsync, player.wasStopped,
       setInterviewState, setCurrentQuestion, addTranscriptEntry, addEvaluation,
       clearEvaluations, setTeachingData, setSummary, setIsAgentSpeaking, setIsProcessing,
       setUserTranscript, setFollowUpText, setIsFollowUpActive,

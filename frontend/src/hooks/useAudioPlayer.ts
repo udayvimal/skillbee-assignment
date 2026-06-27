@@ -2,25 +2,17 @@
 
 import { useCallback, useRef, useState } from "react";
 
-/**
- * Unified sequential audio queue.
- *
- * Every speak() call — whether base64 MP3 or browser TTS fallback — is pushed
- * onto a single FIFO queue and played one at a time.  Nothing is ever
- * cancelled by a subsequent event arriving.  The previous design called
- * speechSynthesis.cancel() in speakText(), which cut off the intro / question
- * whenever the next WS event arrived milliseconds later.
- */
-
 type AudioItem =
   | { type: "mp3";    b64:  string; onDone?: () => void }
   | { type: "speech"; text: string; onDone?: () => void };
 
 export function useAudioPlayer() {
   const [isPlaying, setIsPlaying] = useState(false);
-  const audioRef   = useRef<HTMLAudioElement | null>(null);
-  const queueRef   = useRef<AudioItem[]>([]);
-  const busyRef    = useRef(false); // true while an item is actively playing
+  const audioRef          = useRef<HTMLAudioElement | null>(null);
+  const queueRef          = useRef<AudioItem[]>([]);
+  const busyRef           = useRef(false);
+  const pendingResolveRef = useRef<(() => void) | null>(null); // current playAsync resolve
+  const stoppedEarlyRef   = useRef(false);                     // was the last playAsync force-stopped?
 
   const playNext = useCallback(() => {
     const item = queueRef.current.shift();
@@ -48,21 +40,19 @@ export function useAudioPlayer() {
       return;
     }
 
-    // Browser TTS fallback — NO cancel(), just enqueue
     if (typeof window === "undefined" || !window.speechSynthesis) {
       advance();
       return;
     }
-    const utt  = new SpeechSynthesisUtterance(item.text);
-    utt.rate   = 1.0;
-    utt.pitch  = 1.0;
-    utt.lang   = "en-US";
-    utt.onend  = advance;
+    const utt   = new SpeechSynthesisUtterance(item.text);
+    utt.rate    = 1.0;
+    utt.pitch   = 1.0;
+    utt.lang    = "en-US";
+    utt.onend   = advance;
     utt.onerror = advance;
     window.speechSynthesis.speak(utt);
   }, []);
 
-  /** Enqueue a base64 MP3.  Starts immediately if idle. */
   const play = useCallback(
     (b64: string, onDone?: () => void) => {
       queueRef.current.push({ type: "mp3", b64, onDone });
@@ -71,7 +61,6 @@ export function useAudioPlayer() {
     [playNext]
   );
 
-  /** Enqueue browser TTS.  Starts immediately if idle.  Never cancels. */
   const speakText = useCallback(
     (text: string, onDone?: () => void) => {
       queueRef.current.push({ type: "speech", text, onDone });
@@ -80,28 +69,46 @@ export function useAudioPlayer() {
     [playNext]
   );
 
-  /** Hard stop — used when user clicks "Start Speaking". */
+  /**
+   * Hard stop — clears queue, pauses audio, resolves any pending playAsync()
+   * Promise so the task queue is never left deadlocked.
+   */
   const stop = useCallback(() => {
+    stoppedEarlyRef.current = true;
     queueRef.current = [];
     audioRef.current?.pause();
     audioRef.current = null;
     window.speechSynthesis?.cancel();
     busyRef.current = false;
     setIsPlaying(false);
+    // Unblock the awaiting playAsync() call, if any, so runQueue() can exit cleanly
+    const resolve = pendingResolveRef.current;
+    pendingResolveRef.current = null;
+    resolve?.();
   }, []);
 
   /**
-   * Awaitable version: resolves when the audio item finishes playing.
-   * If `b64` is present, plays MP3; otherwise falls back to browser TTS.
+   * Awaitable version — resolves when audio finishes naturally OR when stop() is called.
+   * After stop(), call wasStopped() to distinguish the two cases.
    */
   const playAsync = useCallback(
-    (b64: string | null | undefined, fallbackText: string): Promise<void> =>
-      new Promise<void>((resolve) => {
-        if (b64) play(b64, resolve);
-        else speakText(fallbackText, resolve);
-      }),
+    (b64: string | null | undefined, fallbackText: string): Promise<void> => {
+      stoppedEarlyRef.current = false;
+      return new Promise<void>((resolve) => {
+        pendingResolveRef.current = resolve;
+        const done = () => {
+          pendingResolveRef.current = null;
+          resolve();
+        };
+        if (b64) play(b64, done);
+        else speakText(fallbackText, done);
+      });
+    },
     [play, speakText]
   );
 
-  return { isPlaying, play, speakText, stop, playAsync };
+  /** Returns true if the last playAsync() was ended early by stop(), not naturally. */
+  const wasStopped = useCallback(() => stoppedEarlyRef.current, []);
+
+  return { isPlaying, play, speakText, stop, playAsync, wasStopped };
 }
