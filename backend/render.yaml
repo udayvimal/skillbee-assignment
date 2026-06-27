@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: techmind-ai-backend
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 1
+    envVars:
+      - key: GROQ_API_KEY
+        sync: false  # Set in Render dashboard
+      - key: PYTHON_VERSION
+        value: "3.11.0"
+    disk:
+      name: data
+      mountPath: /app/app/data
+      sizeGB: 1  # Persists SQLite DB and FAISS cache across deploys
+    healthCheckPath: /health

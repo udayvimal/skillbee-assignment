@@ -1,0 +1,409 @@
+{
+  "version": "1.0.0",
+  "description": "Technical interview Q&A knowledge base for grounded AI evaluation",
+  "questions": [
+    {
+      "id": "py001",
+      "category": "Python",
+      "difficulty": "medium",
+      "question": "Explain Python's Global Interpreter Lock (GIL) and its implications for concurrent programming.",
+      "reference_answer": "The GIL is a mutex in CPython that allows only one thread to execute Python bytecode at a time, even on multi-core systems. It exists because CPython's memory management (reference counting) is not thread-safe. Implications: (1) CPU-bound threads don't benefit from true parallelism—they take turns holding the GIL. (2) I/O-bound threads release the GIL while waiting, so threading works well for network calls, file reads, etc. (3) The multiprocessing module bypasses the GIL by spawning separate processes each with their own interpreter. (4) async/await (asyncio) offers cooperative concurrency without threads, ideal for I/O-heavy workloads. (5) C extensions like NumPy can release the GIL during computation. Key takeaway: use threading for I/O-bound, multiprocessing for CPU-bound, asyncio for high-concurrency I/O.",
+      "key_points": ["GIL prevents true thread parallelism in CPython", "reference counting is why GIL exists", "I/O-bound threads are unaffected", "multiprocessing bypasses GIL", "asyncio is an alternative", "C extensions can release GIL"],
+      "follow_up_questions": [
+        "How would you design a CPU-intensive task (e.g., image processing) to run efficiently in Python?",
+        "What is the difference between threading.Lock and asyncio.Lock?"
+      ],
+      "tags": ["python", "concurrency", "GIL", "threading", "multiprocessing"]
+    },
+    {
+      "id": "py002",
+      "category": "Python",
+      "difficulty": "medium",
+      "question": "What are Python decorators and how do you implement one that measures function execution time?",
+      "reference_answer": "Decorators are higher-order functions that wrap another function to extend its behavior without modifying it. They use the @syntax sugar. A timing decorator implementation: import functools, time. def timer(func): @functools.wraps(func) def wrapper(*args, **kwargs): start = time.perf_counter(); result = func(*args, **kwargs); elapsed = time.perf_counter() - start; print(f'{func.__name__} took {elapsed:.4f}s'); return result; return wrapper. Key concepts: (1) functools.wraps preserves the original function's metadata (__name__, __doc__). (2) *args/**kwargs pass through all arguments. (3) The wrapper returns the original return value. (4) Decorators with arguments need an extra level of nesting (decorator factory). (5) Class-based decorators use __call__. (6) functools.lru_cache is a stdlib decorator for memoization.",
+      "key_points": ["higher-order function concept", "functools.wraps usage", "*args/**kwargs passthrough", "decorator factories for parameterized decorators", "class-based decorators"],
+      "follow_up_questions": [
+        "How would you write a decorator that accepts arguments, like @retry(max_attempts=3)?",
+        "What is the difference between @property and a regular method?"
+      ],
+      "tags": ["python", "decorators", "higher-order functions", "functools"]
+    },
+    {
+      "id": "py003",
+      "category": "Python",
+      "difficulty": "hard",
+      "question": "Explain Python's memory management, including reference counting, garbage collection, and memory pools.",
+      "reference_answer": "Python uses three memory management mechanisms: (1) Reference counting: every object has a refcount; when it hits 0 the memory is freed immediately. Fast and deterministic but cannot handle circular references. (2) Cyclic garbage collector (gc module): runs periodically to detect and collect circular reference cycles. Uses three generations; older objects are collected less frequently. You can trigger it manually with gc.collect(). (3) Memory allocator (pymalloc): Python maintains its own memory pool for small objects (<= 512 bytes) to avoid frequent malloc/free calls to the OS, improving performance. (4) Interning: small integers (-5 to 256) and short strings are cached/interned to avoid duplicate allocations. (5) __slots__: using __slots__ in classes avoids the per-instance __dict__, reducing memory by 30-50% for many instances. (6) weakref module: create weak references that don't increment refcount, useful to break cycles.",
+      "key_points": ["reference counting", "circular reference problem", "gc module", "pymalloc pool allocator", "object interning", "__slots__ optimization", "weakref"],
+      "follow_up_questions": [
+        "When would you use weakref and can you give a practical example?",
+        "How does Python's gc interact with __del__ methods?"
+      ],
+      "tags": ["python", "memory", "garbage collection", "performance", "internals"]
+    },
+    {
+      "id": "py004",
+      "category": "Python",
+      "difficulty": "medium",
+      "question": "What are Python generators and how do they differ from regular functions and list comprehensions?",
+      "reference_answer": "Generators are functions that use yield instead of return to produce a sequence of values lazily, one at a time. Key differences: (1) Memory: a list comprehension builds the entire list in memory; a generator expression (using parentheses) produces values on-demand—critical for large datasets. (2) State: generators maintain local state between yields (stack frame is paused). (3) Iteration protocol: generators implement __iter__ and __next__ automatically. (4) Generator pipelines: you can chain generators for efficient data processing without intermediate collections. (5) send() and throw(): generators can receive values back via gen.send(value) and can handle exceptions via throw(). (6) yield from: delegates to a sub-generator, simplifying recursive generators. (7) async generators: async def with yield for async iteration. Use generators for infinite sequences, streaming data, pipelining ETL steps.",
+      "key_points": ["lazy evaluation", "yield vs return", "memory efficiency", "generator expressions", "yield from", "send() protocol", "generator pipelines"],
+      "follow_up_questions": [
+        "How would you implement an infinite Fibonacci sequence generator?",
+        "What is the difference between yield and yield from?"
+      ],
+      "tags": ["python", "generators", "iterators", "lazy evaluation", "memory"]
+    },
+    {
+      "id": "py005",
+      "category": "Python",
+      "difficulty": "hard",
+      "question": "How does Python's asyncio event loop work, and when would you choose async/await over threading?",
+      "reference_answer": "asyncio implements cooperative multitasking with a single-threaded event loop. The event loop runs coroutines, schedules callbacks, and handles I/O events via OS-level selectors (select/epoll/kqueue). When a coroutine hits await, it voluntarily suspends, returning control to the event loop, which runs another ready coroutine. Key concepts: (1) Coroutines (async def) are not run until awaited or scheduled with asyncio.create_task(). (2) Tasks run concurrently; asyncio.gather() runs multiple coroutines 'in parallel' within the single thread. (3) asyncio is ideal for high-concurrency I/O (thousands of simultaneous network connections) with minimal overhead vs threads. (4) Threading is better for blocking code you can't make async (e.g., legacy libraries, CPU tasks). (5) asyncio.run_in_executor() wraps blocking calls in a thread pool from async code. (6) Avoid blocking calls in async code—they stall the entire event loop. Pitfalls: forgetting await, mixing sync/async code improperly.",
+      "key_points": ["single-threaded event loop", "cooperative multitasking", "coroutines vs threads", "asyncio.gather", "run_in_executor for blocking calls", "when not to use asyncio"],
+      "follow_up_questions": [
+        "How would you handle a CPU-bound task from within an async FastAPI endpoint?",
+        "What is the difference between asyncio.create_task and asyncio.ensure_future?"
+      ],
+      "tags": ["python", "asyncio", "async", "concurrency", "event loop"]
+    },
+    {
+      "id": "js001",
+      "category": "JavaScript",
+      "difficulty": "medium",
+      "question": "Explain JavaScript's event loop, call stack, and the difference between microtasks and macrotasks.",
+      "reference_answer": "JavaScript is single-threaded with an event loop that processes tasks from queues. The call stack executes synchronous code. When async operations complete, their callbacks enter queues. Two queues exist: (1) Microtask queue: Promises (.then, .catch), queueMicrotask(), MutationObserver. Processed after each task until empty—no tasks interleave microtasks. (2) Macrotask queue (task queue): setTimeout, setInterval, setImmediate (Node), I/O callbacks. One macrotask runs per event loop tick. Order per tick: run current synchronous code → drain all microtasks → render (browser) → run one macrotask → repeat. This is why Promise.resolve().then() runs before setTimeout(fn, 0)—it's a microtask. Practical implication: long synchronous code blocks rendering and I/O; heavy computation should be split with setTimeout or done in Web Workers.",
+      "key_points": ["call stack", "microtask vs macrotask queues", "Promise resolution is microtask", "setTimeout is macrotask", "execution order", "Web Workers for CPU tasks"],
+      "follow_up_questions": [
+        "What will this code print: console.log(1); setTimeout(()=>console.log(2),0); Promise.resolve().then(()=>console.log(3)); console.log(4)?",
+        "How does async/await relate to Promises and the microtask queue?"
+      ],
+      "tags": ["javascript", "event loop", "async", "promises", "concurrency"]
+    },
+    {
+      "id": "js002",
+      "category": "JavaScript",
+      "difficulty": "medium",
+      "question": "What is prototypal inheritance in JavaScript and how does it differ from classical inheritance?",
+      "reference_answer": "JavaScript uses prototypal inheritance: every object has a [[Prototype]] (accessible via Object.getPrototypeOf or __proto__) that forms a prototype chain. Property lookup traverses this chain until found or null. Key differences from classical: (1) No class blueprint—objects inherit directly from other objects. (2) ES6 class syntax is syntactic sugar over prototype chains (not true classes). (3) Object.create(proto) creates an object with proto as its prototype without a constructor. (4) Constructor functions + new set up the prototype chain via .prototype property. (5) Classical inheritance is static (defined at compile time); prototypal is dynamic—you can modify prototypes at runtime. (6) Mixins are a better composition pattern in JS than deep inheritance hierarchies. (7) instanceof checks the prototype chain. Understanding the prototype chain is critical for debugging unexpected property lookups and for implementing patterns like mixins, decorators, and factories in JS.",
+      "key_points": ["prototype chain", "Object.create", "constructor + prototype", "ES6 class as sugar", "dynamic vs static", "composition over inheritance", "instanceof"],
+      "follow_up_questions": [
+        "What is the difference between Object.create(null) and {} in JavaScript?",
+        "How would you implement multiple inheritance (mixins) in JavaScript?"
+      ],
+      "tags": ["javascript", "prototypes", "inheritance", "OOP"]
+    },
+    {
+      "id": "js003",
+      "category": "JavaScript",
+      "difficulty": "medium",
+      "question": "Explain closures in JavaScript with a practical example of their use.",
+      "reference_answer": "A closure is a function that retains access to its lexical scope (variables from the outer function) even after the outer function has returned. How it works: when a function is created, it captures a reference to the enclosing scope's variable environment. Practical uses: (1) Data encapsulation/private variables: function createCounter() { let count = 0; return { increment: ()=>++count, get: ()=>count }; }—count is private. (2) Partial application / currying: const multiply = x => y => x * y; const double = multiply(2). (3) Event handlers retaining context: capturing loop variables with IIFE or let (let has block scope). (4) Memoization: caching computed results in closure scope. (5) Module pattern (pre-ES modules): IIFE returning object to expose public API. Common pitfall: closures in loops with var capture the same variable reference—solution is to use let or an IIFE to create a new binding per iteration.",
+      "key_points": ["lexical scoping", "function retains outer scope", "private variables", "module pattern", "partial application", "loop var pitfall", "let vs var in loops"],
+      "follow_up_questions": [
+        "What is a memory leak in the context of closures and how do you prevent it?",
+        "How do closures relate to the module pattern in JavaScript?"
+      ],
+      "tags": ["javascript", "closures", "scope", "lexical environment"]
+    },
+    {
+      "id": "js004",
+      "category": "JavaScript",
+      "difficulty": "hard",
+      "question": "How does JavaScript's Promise work internally, and how would you implement Promise.all from scratch?",
+      "reference_answer": "A Promise is an object representing eventual completion or failure of an async operation, with three states: pending, fulfilled, rejected. Internally it holds a state machine, a value/reason, and queues of fulfillment/rejection handlers. When resolve(v) is called, all .then handlers are scheduled as microtasks. Implementation of Promise.all: function promiseAll(promises) { return new Promise((resolve, reject) => { if (!promises.length) return resolve([]); const results = new Array(promises.length); let remaining = promises.length; promises.forEach((p, i) => { Promise.resolve(p).then(val => { results[i] = val; if (--remaining === 0) resolve(results); }).catch(reject); }); }); }. Key behaviors: (1) Resolves when ALL resolve, preserving order. (2) Rejects immediately on first rejection. (3) Promise.allSettled waits for all regardless of outcome. (4) Promise.race resolves/rejects with whichever settles first. (5) Promise.any resolves with first fulfilled, rejects if all reject (AggregateError).",
+      "key_points": ["three states", "microtask scheduling", "Promise.all implementation", "short-circuit on rejection", "Promise.allSettled vs Promise.all", "Promise.race", "Promise.any"],
+      "follow_up_questions": [
+        "How would you add timeout functionality to a Promise?",
+        "What is the difference between Promise.all and Promise.allSettled?"
+      ],
+      "tags": ["javascript", "promises", "async", "implementation", "microtasks"]
+    },
+    {
+      "id": "ts001",
+      "category": "TypeScript",
+      "difficulty": "medium",
+      "question": "Explain TypeScript's type system features: generics, conditional types, and mapped types.",
+      "reference_answer": "TypeScript's advanced type system allows precise modeling of complex data. (1) Generics: parameterize types over type variables. function identity<T>(arg: T): T—reusable while remaining type-safe. Constraints: T extends Serializable limits what can be passed. (2) Conditional types: T extends U ? X : Y—types that depend on other types. Built-in: NonNullable<T>, ReturnType<F>, Parameters<F>, Awaited<T>. (3) Mapped types: transform each property of a type. type Readonly<T> = { readonly [K in keyof T]: T[K] }. Modifiers: -, + to add/remove readonly/optional. (4) Template literal types: `${string}-id` creates string literal patterns. (5) infer: extract types inside conditional types. type ReturnType<T> = T extends (...args: any[]) => infer R ? R : never. (6) Utility types: Partial, Required, Pick, Omit, Record, Exclude, Extract all built on these primitives. Mastering these allows zero-runtime type safety.",
+      "key_points": ["generics with constraints", "conditional types", "mapped types", "keyof and in", "infer keyword", "built-in utility types"],
+      "follow_up_questions": [
+        "How would you write a DeepPartial<T> type that makes all nested properties optional?",
+        "What is the difference between unknown and any in TypeScript?"
+      ],
+      "tags": ["typescript", "generics", "type system", "mapped types", "conditional types"]
+    },
+    {
+      "id": "react001",
+      "category": "React",
+      "difficulty": "medium",
+      "question": "Explain React's reconciliation algorithm and how the virtual DOM enables efficient updates.",
+      "reference_answer": "React's reconciliation algorithm (Fiber in React 16+) determines the minimal DOM mutations needed when state changes. The virtual DOM is a lightweight JS representation of the real DOM. When state/props change: (1) React creates a new virtual DOM tree (render phase). (2) Diffing algorithm compares old vs new VDOM—O(n) heuristics: same-type elements update in place; different types unmount/remount; lists use keys to identify stable elements. (3) Fiber architecture splits work into units, making reconciliation interruptible for high-priority updates (concurrent mode). (4) Commit phase applies the minimal diff to the real DOM in a single synchronous pass. Keys: unique, stable identifiers on list items. Without keys, React falls back to index-based comparison, causing incorrect reorders. Why using array index as key is bad: reorders cause wrong component reuse, lost state, and poor performance. React.memo memoizes component output; useMemo/useCallback memoize values/functions to skip re-renders.",
+      "key_points": ["virtual DOM diffing", "O(n) heuristics", "Fiber interruptible rendering", "keys for lists", "index as key is bad", "React.memo", "commit phase"],
+      "follow_up_questions": [
+        "When does a React component re-render, and what are all the ways to prevent unnecessary re-renders?",
+        "What is the difference between useCallback and useMemo?"
+      ],
+      "tags": ["react", "reconciliation", "virtual DOM", "fiber", "performance"]
+    },
+    {
+      "id": "react002",
+      "category": "React",
+      "difficulty": "medium",
+      "question": "What are React hooks and explain the rules, internals, and when to create a custom hook.",
+      "reference_answer": "Hooks are functions letting function components use state and lifecycle features. Two rules: (1) Only call at top level—not inside conditionals/loops/nested functions. This ensures hooks are called in the same order every render (React identifies hooks by call order, not names). (2) Only call from function components or custom hooks. Core hooks: useState (local state), useEffect (side effects/cleanup), useRef (mutable ref without re-render), useContext (consume context), useReducer (complex state), useMemo/useCallback (memoization), useLayoutEffect (sync after DOM mutations). Custom hooks: extract reusable stateful logic into functions starting with 'use'. Example: useDebounce(value, delay), useLocalStorage(key), useFetch(url). When to create: when the same stateful logic appears in 2+ components; when a component has complex effect logic to isolate; to encapsulate external system subscriptions. Custom hooks can call other hooks and own their own state.",
+      "key_points": ["rules of hooks", "call order invariant", "useState/useEffect/useRef/useContext", "custom hooks", "when to extract", "useMemo vs useCallback"],
+      "follow_up_questions": [
+        "How does useEffect handle cleanup and what is the return function used for?",
+        "Implement a custom usePrevious hook that returns the previous value of a variable."
+      ],
+      "tags": ["react", "hooks", "useState", "useEffect", "custom hooks"]
+    },
+    {
+      "id": "react003",
+      "category": "React",
+      "difficulty": "hard",
+      "question": "Explain React's concurrent features: Suspense, transitions, and how they improve user experience.",
+      "reference_answer": "React Concurrent Mode (stable in React 18) allows React to work on multiple versions of the UI simultaneously, interrupting and resuming renders. (1) Transitions (startTransition/useTransition): marks updates as non-urgent. React keeps the current UI interactive while preparing the next state. useTransition returns [isPending, startTransition]—isPending lets you show loading indicators without Suspense. (2) Suspense: declaratively handles asynchronous loading states. A component throws a Promise when data is not ready; the nearest Suspense boundary catches it and shows fallback. With concurrent features, Suspense works for data fetching (via libraries like React Query, Relay with server components). (3) useDeferredValue: defers re-rendering of non-critical UI. (4) Server Components (Next.js App Router): render on server, reducing client JS bundle. They can directly await data; client components are wrapped with 'use client'. (5) Streaming SSR with Suspense: sends HTML in chunks as components resolve, improving TTFB and TTI.",
+      "key_points": ["concurrent rendering", "startTransition/useTransition", "Suspense boundaries", "useDeferredValue", "Server Components", "streaming SSR", "isPending"],
+      "follow_up_questions": [
+        "What is the difference between useTransition and useDeferredValue?",
+        "How do React Server Components change the mental model for data fetching?"
+      ],
+      "tags": ["react", "concurrent", "suspense", "transitions", "server components"]
+    },
+    {
+      "id": "ds001",
+      "category": "Data Structures",
+      "difficulty": "medium",
+      "question": "Compare hash maps and binary search trees. When would you choose one over the other?",
+      "reference_answer": "Hash maps (hash tables) provide average O(1) insert/delete/lookup via hash function + array. Worst case O(n) with many collisions (mitigated by good hash functions and load factor management). BSTs (balanced: AVL, Red-Black) provide O(log n) guaranteed insert/delete/lookup and keep data sorted, enabling in-order traversal, range queries, predecessor/successor in O(log n). Choose hash map when: (1) You need fastest average-case point lookups. (2) Order doesn't matter. (3) Keys are hashable. (4) Frequency counting, caching, de-duplication. Choose BST when: (1) You need sorted order. (2) Range queries (all keys between A and B). (3) Finding min/max efficiently. (4) Ordered iteration is required. (5) Worst-case O(log n) guarantee matters. In practice: Python dict/set = hash map, Java TreeMap/TreeSet = red-black BST, std::map in C++ = BST. Skip lists are an alternative to BSTs with simpler implementation and probabilistic balance.",
+      "key_points": ["hash map O(1) average", "BST O(log n) guaranteed", "collision handling", "sorted order advantage of BST", "range queries", "when each is preferred"],
+      "follow_up_questions": [
+        "How does Python handle hash collisions in its dict implementation?",
+        "How would you implement a LRU cache using a hash map and a doubly linked list?"
+      ],
+      "tags": ["data structures", "hash map", "BST", "complexity", "algorithms"]
+    },
+    {
+      "id": "ds002",
+      "category": "Data Structures",
+      "difficulty": "hard",
+      "question": "Explain dynamic programming: when to use it, the top-down vs bottom-up approaches, and time/space trade-offs.",
+      "reference_answer": "Dynamic programming solves problems by breaking them into overlapping subproblems and storing solutions to avoid recomputation. When to use: (1) Optimal substructure: optimal solution built from optimal subsolutions. (2) Overlapping subproblems: naive recursion recomputes the same states. Two approaches: (1) Top-down (memoization): recursive solution with a memo cache (dict/array). Natural to think in but has recursion overhead and may hit Python's recursion limit. (2) Bottom-up (tabulation): iterative; fill a table from base cases up. Usually faster (no recursion overhead) and simpler space optimization. Space optimization: often only the previous row/element is needed (e.g., Fibonacci: O(n) space → O(1)). Classic problems: Fibonacci, 0/1 Knapsack, Longest Common Subsequence (O(mn) time, O(mn) or O(n) space), Longest Increasing Subsequence (O(n²) DP or O(n log n) with patience sorting), Coin Change, Edit Distance, Matrix Chain Multiplication. Key insight: define state clearly, identify transitions, pick base cases.",
+      "key_points": ["overlapping subproblems", "optimal substructure", "memoization vs tabulation", "space optimization", "state definition", "classic DP problems"],
+      "follow_up_questions": [
+        "Walk me through the space optimization of the longest common subsequence algorithm.",
+        "How would you identify if a problem can be solved with DP vs greedy?"
+      ],
+      "tags": ["algorithms", "dynamic programming", "memoization", "tabulation", "optimization"]
+    },
+    {
+      "id": "ds003",
+      "category": "Data Structures",
+      "difficulty": "medium",
+      "question": "Explain graph traversal algorithms (BFS, DFS) and their use cases.",
+      "reference_answer": "BFS (Breadth-First Search) uses a queue; explores all neighbors at depth d before depth d+1. Time: O(V+E). Use cases: (1) Shortest path in unweighted graph (guaranteed minimum hops). (2) Level-order tree traversal. (3) Finding all nodes within distance k. (4) Social network: friends of friends. DFS (Depth-First Search) uses a stack (or recursion); explores as deep as possible before backtracking. Time: O(V+E). Use cases: (1) Topological sort (use DFS post-order). (2) Cycle detection. (3) Finding connected components. (4) Maze solving. (5) Generating all permutations/combinations. (6) Strongly connected components (Tarjan/Kosaraju). Dijkstra's algorithm: shortest path in weighted graph with non-negative weights, uses priority queue, O((V+E) log V). Bellman-Ford: handles negative weights, O(VE). A*: heuristic-guided shortest path for grids/maps. Topological sort (Kahn's BFS-based or DFS): ordering of DAG nodes, used in build systems, task scheduling.",
+      "key_points": ["BFS uses queue", "DFS uses stack/recursion", "BFS for shortest path unweighted", "DFS for topological sort", "Dijkstra for weighted", "cycle detection via DFS"],
+      "follow_up_questions": [
+        "How would you detect a cycle in a directed graph?",
+        "When would you use Dijkstra's over BFS?"
+      ],
+      "tags": ["algorithms", "graphs", "BFS", "DFS", "traversal", "Dijkstra"]
+    },
+    {
+      "id": "ds004",
+      "category": "Data Structures",
+      "difficulty": "medium",
+      "question": "What is a heap data structure and how does it power priority queues and heap sort?",
+      "reference_answer": "A heap is a complete binary tree satisfying the heap property: in a min-heap, every parent <= its children (max-heap: parent >= children). Typically implemented as an array where for index i: left child = 2i+1, right child = 2i+2, parent = (i-1)//2. Operations: insert (append then sift-up): O(log n); extract-min/max (swap root with last, remove last, sift-down): O(log n); peek: O(1); heapify (build heap from array): O(n)—not O(n log n). Priority queue is the ADT; heap is the implementation. Python: heapq module (min-heap only; negate for max-heap). Use cases: (1) Dijkstra's shortest path. (2) Task scheduling. (3) Merge k sorted arrays: O(n log k). (4) Top-k elements: O(n log k). (5) Heap sort: heapify + n extractions = O(n log n), in-place but not stable. Fibonacci heap: amortized O(1) insert, useful for advanced graph algorithms but complex to implement.",
+      "key_points": ["complete binary tree", "array representation", "O(log n) insert/extract", "O(n) heapify", "priority queue use cases", "heapq in Python", "top-k pattern"],
+      "follow_up_questions": [
+        "How would you find the k largest elements from a stream of integers efficiently?",
+        "Explain the O(n) heapify proof—why is it not O(n log n)?"
+      ],
+      "tags": ["data structures", "heap", "priority queue", "sorting", "heapq"]
+    },
+    {
+      "id": "db001",
+      "category": "Databases",
+      "difficulty": "medium",
+      "question": "Explain database indexing: how B-tree indexes work, when to add them, and when they hurt performance.",
+      "reference_answer": "A B-tree index is a self-balancing tree structure that allows O(log n) lookups, range scans, and sorted access. Database stores index separately from data; leaf nodes contain keys + row pointers (or full row for clustered/covering indexes). B-tree vs B+ tree: B+ trees store all data in leaves and link leaves for efficient range scans—used by PostgreSQL, MySQL InnoDB. When to add indexes: (1) Columns frequently in WHERE, JOIN ON, ORDER BY, GROUP BY clauses. (2) High-cardinality columns (many distinct values). (3) Foreign key columns for join performance. When indexes hurt: (1) INSERT/UPDATE/DELETE are slower—index must be maintained. (2) Low-cardinality columns (e.g., boolean)—full scan may be faster. (3) Small tables—sequential scan is faster than index lookup. (4) Too many indexes waste disk space and slow writes. Types: composite (multi-column, order matters), partial (WHERE condition), covering (includes all query columns), GiST/GIN for full-text/JSON/arrays (PostgreSQL). EXPLAIN/EXPLAIN ANALYZE to verify index usage.",
+      "key_points": ["B+ tree structure", "O(log n) lookup", "clustered vs non-clustered", "when to add", "when indexes hurt writes", "composite index column order", "covering index", "EXPLAIN"],
+      "follow_up_questions": [
+        "How does a composite index on (a, b) differ from two separate indexes on a and b?",
+        "What is the difference between a clustered and a non-clustered index?"
+      ],
+      "tags": ["databases", "indexing", "B-tree", "SQL", "performance", "PostgreSQL"]
+    },
+    {
+      "id": "db002",
+      "category": "Databases",
+      "difficulty": "hard",
+      "question": "Explain database ACID properties and how they're implemented in practice.",
+      "reference_answer": "ACID guarantees reliable database transactions: (1) Atomicity: a transaction is all-or-nothing. Implemented via write-ahead logging (WAL) / undo logs—if the transaction fails, changes are rolled back. (2) Consistency: a transaction brings DB from one valid state to another (constraints, referential integrity, triggers enforced). Responsibility split between DB engine and application. (3) Isolation: concurrent transactions appear as if run serially. Implemented via locking (2PL) or MVCC (multi-version concurrency control). Isolation levels—READ UNCOMMITTED (dirty reads), READ COMMITTED (no dirty reads, default in PG), REPEATABLE READ (no non-repeatable reads), SERIALIZABLE (no phantom reads, full isolation). Each level trades isolation for concurrency. MVCC (PostgreSQL, InnoDB): readers see a snapshot; writers create new row versions; no read-write contention. (4) Durability: committed transactions survive crashes. WAL writes log to disk before data pages; on restart, redo/undo applies. fsync ensures log hits disk. PostgreSQL uses WAL + checkpoint. Trade-off: fsync=off improves performance but risks data loss on crash.",
+      "key_points": ["atomicity via WAL/undo log", "consistency = constraints", "isolation levels", "MVCC vs locking", "READ COMMITTED default", "durability via WAL + fsync", "2PL vs MVCC"],
+      "follow_up_questions": [
+        "What is a phantom read and which isolation level prevents it?",
+        "How does MVCC in PostgreSQL avoid lock contention between readers and writers?"
+      ],
+      "tags": ["databases", "ACID", "transactions", "MVCC", "isolation levels", "WAL"]
+    },
+    {
+      "id": "db003",
+      "category": "Databases",
+      "difficulty": "medium",
+      "question": "Write and explain a SQL query to find the second highest salary from an employee table.",
+      "reference_answer": "Several approaches exist: (1) Subquery: SELECT MAX(salary) FROM employees WHERE salary < (SELECT MAX(salary) FROM employees); — simple but reads table twice. (2) OFFSET/LIMIT: SELECT DISTINCT salary FROM employees ORDER BY salary DESC LIMIT 1 OFFSET 1; — clean and readable. (3) Dense rank window function: SELECT salary FROM (SELECT salary, DENSE_RANK() OVER (ORDER BY salary DESC) as rnk FROM employees) t WHERE rnk = 2; — handles ties correctly (DENSE_RANK gives same rank to ties, no gaps). (4) ROW_NUMBER() would skip tied values; RANK() has gaps after ties; DENSE_RANK() no gaps. Best approach for Nth highest: the window function approach generalizes easily (change WHERE rnk = N). Edge cases: what if fewer than 2 distinct salaries exist? Return NULL (the subquery and window approaches handle this naturally). Indexes on salary column improve performance. This question tests knowledge of subqueries, window functions, and handling edge cases.",
+      "key_points": ["MAX with subquery", "OFFSET approach", "DENSE_RANK window function", "RANK vs DENSE_RANK vs ROW_NUMBER", "generalizing to Nth", "NULL edge case", "tie handling"],
+      "follow_up_questions": [
+        "How would you extend this to find the top 3 salaries per department?",
+        "What is the difference between RANK, DENSE_RANK, and ROW_NUMBER window functions?"
+      ],
+      "tags": ["SQL", "window functions", "subqueries", "ranking", "databases"]
+    },
+    {
+      "id": "sys001",
+      "category": "System Design",
+      "difficulty": "hard",
+      "question": "Design a URL shortener like bit.ly. Walk through the architecture for scale.",
+      "reference_answer": "Requirements: shorten URLs, redirect to original, handle ~100M URLs, ~100K reads/second, 10:1 read/write ratio. Functional: generate short code (6-7 chars), redirect, optional expiry, click analytics. Core design: (1) Short code generation: base62 encoding of a unique ID (counter from distributed ID generator like Snowflake, or nanoid). Avoid random collisions at scale—counter is simpler. (2) Storage: URLs stored in SQL or NoSQL (Cassandra for write-heavy). Schema: short_code (PK), original_url, created_at, expires_at, user_id. Index on short_code. (3) Redirect service: lookup short_code → original_url → HTTP 301 (permanent, browser caches, reduces load) or 302 (temporary, tracks every request). 302 for analytics. (4) Caching: Redis/Memcached in front of DB. 80/20 rule—cache top 20% of URLs. (5) CDN: edge servers cache popular redirects. (6) Analytics: async event streaming (Kafka) → analytics DB (ClickHouse). (7) Horizontal scaling: stateless redirect servers behind load balancer. DB replication for read scaling. (8) Rate limiting: per-IP or per-token to prevent abuse.",
+      "key_points": ["ID generation strategy", "301 vs 302 redirect", "caching hot URLs", "DB schema", "analytics via Kafka", "horizontal scaling", "CDN", "rate limiting"],
+      "follow_up_questions": [
+        "How would you handle the case where the same long URL is submitted multiple times?",
+        "How would you design the analytics system to track click counts efficiently?"
+      ],
+      "tags": ["system design", "scalability", "caching", "databases", "URL shortener"]
+    },
+    {
+      "id": "sys002",
+      "category": "System Design",
+      "difficulty": "hard",
+      "question": "Design a rate limiter. Explain different algorithms and how you'd implement one at scale.",
+      "reference_answer": "Rate limiting prevents API abuse and ensures fair resource usage. Algorithms: (1) Token bucket: tokens added at fixed rate; requests consume tokens; burst allowed up to bucket size. Flexible, allows bursts. (2) Leaky bucket: requests added to queue at any rate; processed at fixed rate; prevents bursts. (3) Fixed window counter: count requests per time window (e.g., per minute). Simple but allows 2x burst at window boundaries. (4) Sliding window log: log timestamps of requests; count within rolling window. Accurate but memory-intensive. (5) Sliding window counter: approximate sliding window using current + previous window counts weighted by position. Accurate and memory-efficient. Implementation at scale: (1) Redis with INCR + EXPIRE for fixed window (atomic, TTL-based). (2) Redis sorted sets for sliding window log. (3) Lua scripts for atomicity. (4) For distributed rate limiting: central Redis cluster. (5) Token bucket in Redis: INCRBY/DECRBY with TTL. API gateway (Kong, AWS API Gateway) has built-in rate limiting. Return 429 Too Many Requests with Retry-After header. Different limits per user tier (free/premium).",
+      "key_points": ["token bucket algorithm", "leaky bucket", "fixed window boundary bug", "sliding window counter", "Redis implementation", "atomic Lua scripts", "429 status code", "distributed considerations"],
+      "follow_up_questions": [
+        "How would you implement rate limiting without Redis in a multi-server setup?",
+        "What are the trade-offs between the sliding window log and sliding window counter approaches?"
+      ],
+      "tags": ["system design", "rate limiting", "Redis", "algorithms", "distributed systems"]
+    },
+    {
+      "id": "sys003",
+      "category": "System Design",
+      "difficulty": "hard",
+      "question": "Explain CAP theorem and how it applies to real distributed system design decisions.",
+      "reference_answer": "CAP theorem states a distributed system can guarantee at most 2 of 3 properties during a network partition: (1) Consistency: every read returns the most recent write or an error. (2) Availability: every request receives a non-error response (may not be most recent). (3) Partition Tolerance: system continues operating despite network partitions. Since partitions are unavoidable in distributed systems, you must choose between CP or AP. CP systems (choose consistency): HBase, ZooKeeper, etcd—reject/block reads during partitions to avoid stale data. Good for financial systems, config stores, leader election. AP systems (choose availability): DynamoDB, Cassandra, CouchDB—return potentially stale data rather than error. Good for social feeds, shopping carts, DNS. PACELC extends CAP: even without partitions (P), tradeoff between latency (L) and consistency (C) exists. Eventual consistency: AP systems converge to consistency once partition heals, via anti-entropy, gossip protocols, vector clocks for conflict resolution. Strong vs eventual consistency trade-offs affect system complexity, latency, and correctness guarantees.",
+      "key_points": ["CAP definition", "partition tolerance always required", "CP vs AP choice", "examples of each", "PACELC", "eventual consistency", "gossip/anti-entropy"],
+      "follow_up_questions": [
+        "How does DynamoDB handle the trade-off between consistency and availability?",
+        "What is vector clock and how does it help resolve conflicts in eventually consistent systems?"
+      ],
+      "tags": ["system design", "distributed systems", "CAP theorem", "consistency", "availability"]
+    },
+    {
+      "id": "sys004",
+      "category": "System Design",
+      "difficulty": "hard",
+      "question": "Design a notification system (push/email/SMS) that handles millions of users.",
+      "reference_answer": "Requirements: millions of users, multiple channels (push, email, SMS), reliable delivery, user preferences, templates, rate limiting. Architecture: (1) Notification API Service: accepts notification requests, validates, enriches with user preferences and templates. (2) Message queue (Kafka/SQS): decouples request ingestion from delivery. Topics per channel type or priority tier (critical/marketing). Provides replay, backpressure handling, dead letter queue for failures. (3) Workers per channel: Push worker (APNs/FCM), Email worker (SendGrid/SES), SMS worker (Twilio). Each scales independently. (4) User preference service: stores per-user channel preferences, quiet hours, opt-outs. Checked before delivery. (5) Template engine: personalize notifications with user data. Cache compiled templates. (6) Delivery tracking: log delivery status in DB; retry failed deliveries with exponential backoff. (7) Rate limiting: per-user frequency capping (don't spam users). (8) Priority queues: transactional (OTP, password reset) > user activity > marketing. (9) Deduplication: idempotency keys prevent duplicate sends. Scale: partition Kafka by user_id for ordering guarantees per user.",
+      "key_points": ["message queue decoupling", "per-channel workers", "user preferences", "retry + DLQ", "rate limiting/frequency capping", "priority tiers", "delivery tracking", "idempotency"],
+      "follow_up_questions": [
+        "How would you handle user opt-out and ensure it's respected across all channels?",
+        "How do you prevent the thundering herd problem when sending notifications to millions of users at once?"
+      ],
+      "tags": ["system design", "notifications", "Kafka", "scalability", "async processing"]
+    },
+    {
+      "id": "api001",
+      "category": "API Design",
+      "difficulty": "medium",
+      "question": "Compare REST, GraphQL, and gRPC. When would you choose each?",
+      "reference_answer": "REST: resource-based URLs, HTTP methods (GET/POST/PUT/DELETE), stateless, widely supported. Pros: simple, cacheable (GET), great tooling, broad client support. Cons: over-fetching/under-fetching, multiple round trips for related data, no strong type enforcement without OpenAPI. Choose REST for: public APIs, simple CRUD, browser clients, caching requirements. GraphQL: query language where clients specify exact data needed. Pros: no over/under-fetching, single endpoint, strong schema/type system, great for complex nested data and diverse clients (mobile vs web need different fields). Cons: complex caching, N+1 query problem (use DataLoader), steeper learning curve, not ideal for file upload. Choose GraphQL for: complex data graphs, multiple client types, rapid frontend iteration, BFF (backend for frontend). gRPC: uses Protocol Buffers (binary), HTTP/2 for bidirectional streaming, code-generated clients. Pros: very low latency and bandwidth (binary + HTTP/2), strong typing, streaming support, multi-language clients. Cons: not human-readable, poor browser support (needs gRPC-web), binary debugging harder. Choose gRPC for: microservice-to-microservice communication, real-time bidirectional streaming, performance-critical internal APIs.",
+      "key_points": ["REST for public/cached APIs", "GraphQL for data fetching flexibility", "gRPC for internal/streaming", "N+1 problem in GraphQL", "binary vs JSON", "streaming in gRPC"],
+      "follow_up_questions": [
+        "How would you solve the N+1 problem in a GraphQL API?",
+        "What is HTTP/2 and why does it benefit gRPC?"
+      ],
+      "tags": ["API design", "REST", "GraphQL", "gRPC", "microservices"]
+    },
+    {
+      "id": "api002",
+      "category": "API Design",
+      "difficulty": "medium",
+      "question": "How would you design a RESTful API for versioning, authentication, and error handling?",
+      "reference_answer": "Versioning strategies: (1) URL path versioning: /v1/users (most common, explicit, easy to route). (2) Header versioning: Accept: application/vnd.api+json;version=1 (clean URLs, harder to test in browser). (3) Query param: /users?version=1 (simple but pollutes URLs). Best practice: URL path versioning for public APIs; support N-1 versions. Authentication: (1) JWT (stateless): server signs token with secret; client sends in Authorization: Bearer header; no server-side session storage; short expiry + refresh tokens. (2) OAuth 2.0: delegated authorization for third-party access; use Authorization Code with PKCE for browser clients. (3) API keys: simple for server-to-server. Error handling: consistent error schema—{ error: { code: 'RESOURCE_NOT_FOUND', message: '...', details: [...] } }. Use appropriate HTTP status codes: 400 (bad request), 401 (unauthenticated), 403 (forbidden), 404 (not found), 409 (conflict), 422 (validation error), 429 (rate limited), 500 (server error). Never expose internal errors to clients. Use correlation IDs for tracing. Return validation errors per field for 422.",
+      "key_points": ["URL path versioning", "JWT with refresh tokens", "OAuth 2.0 for third-party", "consistent error schema", "HTTP status codes", "correlation IDs", "never expose internals"],
+      "follow_up_questions": [
+        "What are the security implications of storing JWTs in localStorage vs httpOnly cookies?",
+        "How would you handle backward compatibility when adding a required field to an existing API?"
+      ],
+      "tags": ["API design", "REST", "authentication", "JWT", "versioning", "error handling"]
+    },
+    {
+      "id": "beh001",
+      "category": "Behavioral",
+      "difficulty": "medium",
+      "question": "Tell me about a time you had to debug a critical production issue under pressure. How did you approach it?",
+      "reference_answer": "Strong answers demonstrate a structured debugging approach: (1) Triage and communication: immediately assess severity and notify stakeholders; establish incident channel. (2) Hypothesis-driven debugging: gather symptoms first (logs, monitoring dashboards, error rates, recent deployments). (3) Narrow the scope: binary search—which service? Which endpoint? Since when? Correlate with deployment or config changes. (4) Reproduce locally or in staging if possible. (5) Apply minimal fix, test, deploy with feature flag or gradual rollout. (6) Post-mortem (blameless): root cause analysis, timeline, contributing factors, action items to prevent recurrence. Look for: use of observability tools (Datadog, Sentry, CloudWatch), communication with team/stakeholders, staying calm under pressure, systematic elimination, not fixing symptoms but root causes, post-incident improvement.",
+      "key_points": ["incident communication", "structured hypothesis-driven debugging", "use of monitoring/logs", "correlating with recent changes", "minimal targeted fix", "blameless post-mortem", "systematic approach"],
+      "follow_up_questions": [
+        "What observability tooling do you rely on most and why?",
+        "How do you prevent future occurrences of similar incidents?"
+      ],
+      "tags": ["behavioral", "debugging", "incident management", "communication", "problem solving"]
+    },
+    {
+      "id": "beh002",
+      "category": "Behavioral",
+      "difficulty": "medium",
+      "question": "Describe a situation where you disagreed with a technical decision made by your team. How did you handle it?",
+      "reference_answer": "Strong answers show: (1) Respectful, data-driven disagreement—raised concerns with evidence (benchmarks, references, past experience) rather than opinions. (2) Choosing the right moment and forum—1:1 with tech lead first, then design review if needed; not escalating publicly. (3) Proposing alternatives, not just objecting—presented a counter-proposal with pros/cons. (4) Willing to commit once a decision is made—disagree and commit principle. (5) Knowing when to escalate vs defer—if the decision posed a significant risk (security, correctness), escalated appropriately. (6) Positive outcome focus—what was learned, relationship maintained. Red flags: dismissing others' opinions, going around the team, holding grudges, refusing to commit to a decision that went against them.",
+      "key_points": ["data-driven disagreement", "right forum", "propose alternatives", "disagree and commit", "escalation judgment", "outcome and relationship focus"],
+      "follow_up_questions": [
+        "Has there been a time when you were wrong about a technical decision? What happened?",
+        "How do you build technical consensus within a team with diverse opinions?"
+      ],
+      "tags": ["behavioral", "conflict resolution", "teamwork", "communication", "leadership"]
+    },
+    {
+      "id": "beh003",
+      "category": "Behavioral",
+      "difficulty": "medium",
+      "question": "Tell me about a complex technical project you owned end-to-end. How did you manage it?",
+      "reference_answer": "Strong answers cover: (1) Scope definition: understanding requirements, clarifying ambiguities, defining success metrics upfront. (2) Breaking down work: decomposing into milestones, identifying dependencies and critical path. (3) Stakeholder communication: regular updates, early risk escalation, managing expectations. (4) Technical leadership: making key architectural decisions, unblocking teammates, code reviews. (5) Iterative delivery: shipping incrementally, getting early feedback, adapting. (6) Handling setbacks: technical obstacles, team changes, scope creep—how they navigated. (7) Results: quantified impact (latency reduction, cost savings, user impact). Look for: ownership mentality, structured thinking, communication skills, adaptability, impact orientation.",
+      "key_points": ["requirements clarification", "milestone decomposition", "stakeholder communication", "technical decision-making", "iterative delivery", "handling setbacks", "quantified results"],
+      "follow_up_questions": [
+        "What was the hardest technical challenge in that project and how did you solve it?",
+        "How did you prioritize when scope expanded beyond the original plan?"
+      ],
+      "tags": ["behavioral", "project management", "ownership", "leadership", "communication"]
+    },
+    {
+      "id": "beh004",
+      "category": "Behavioral",
+      "difficulty": "easy",
+      "question": "How do you approach learning new technologies or frameworks? Give a recent example.",
+      "reference_answer": "Strong answers show a structured, proactive learning approach: (1) Identifying the learning goal: why this tech, what problem does it solve, is it worth learning now? (2) Learning strategy: official docs first (authoritative), then hands-on project (applied), then community resources (blogs, talks) for deeper patterns. (3) Building something real: 'hello world' projects don't stick; building something that matters cements learning. (4) Sharing knowledge: writing a blog post, giving a tech talk, or teaching a teammate demonstrates mastery and benefits the team. (5) Staying current: following official channels, newsletters (e.g., JavaScript Weekly), curated Twitter/X lists. (6) Balancing depth vs breadth: going deep on fundamentals (CS, distributed systems) while staying broad on tools. Recent example should be specific and recent—shows genuine curiosity and self-driven growth.",
+      "key_points": ["goal-driven learning", "docs-first approach", "building real projects", "knowledge sharing", "staying current", "depth vs breadth balance"],
+      "follow_up_questions": [
+        "How do you decide which new technology is worth investing time in?",
+        "How do you keep your skills sharp when you're on a project with mature, stable tech?"
+      ],
+      "tags": ["behavioral", "learning", "growth mindset", "self-improvement"]
+    },
+    {
+      "id": "beh005",
+      "category": "Behavioral",
+      "difficulty": "medium",
+      "question": "Describe a time you improved a process or system proactively without being asked.",
+      "reference_answer": "Strong answers demonstrate initiative, impact, and ownership: (1) Identifying the pain point: noticed a recurring issue (slow deploys, flaky tests, manual process, monitoring gap) that others had accepted as normal. (2) Quantifying the problem: measured the actual cost (engineer-hours lost, error rate, latency). (3) Proposing and getting buy-in: presented the problem and solution to the team; got alignment before spending significant time. (4) Implementing with minimal disruption: shipped incrementally, added rollback plan. (5) Measuring impact: tracked before/after metrics. (6) Socializing the improvement: documented it, shared in team retro. Red flags: improving things without measuring impact, breaking existing behavior, not involving affected stakeholders, inflating the contribution.",
+      "key_points": ["proactive identification", "quantifying the problem", "getting buy-in", "incremental implementation", "measuring impact", "documentation and knowledge sharing"],
+      "follow_up_questions": [
+        "How do you balance proactive improvements with your primary project work?",
+        "What was the reception from the team and how did you handle any resistance?"
+      ],
+      "tags": ["behavioral", "initiative", "ownership", "process improvement", "impact"]
+    }
+  ]
+}

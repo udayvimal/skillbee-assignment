@@ -1,0 +1,9 @@
+{
+  "framework": "nextjs",
+  "buildCommand": "npm run build",
+  "devCommand": "npm run dev",
+  "env": {
+    "NEXT_PUBLIC_API_URL": "@techmind-api-url",
+    "NEXT_PUBLIC_WS_URL": "@techmind-ws-url"
+  }
+}
